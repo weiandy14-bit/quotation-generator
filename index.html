@@ -17,9 +17,14 @@
     label { display: block; margin-bottom: 4px; font-weight: 500; font-size: 0.9rem; color: var(--text-muted); }
     input, select, textarea { width: 100%; padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.95rem; }
     input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 2px rgba(37,99,235,0.2); }
+    
+    /* 🔧 表格樣式優化 - 確保 PDF 完整顯示 */
     table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-    th, td { padding: 10px; border-bottom: 1px solid var(--border); text-align: left; }
+    th, td { padding: 10px; border: 1px solid var(--border); text-align: left; }
     th { background: #f1f5f9; font-weight: 600; }
+    td input { border: none; padding: 4px 8px; background: transparent; }
+    td input:focus { background: #f1f5f9; border-radius: 4px; outline: none; }
+    
     .actions { display: flex; gap: 10px; margin-top: 10px; flex-wrap: wrap; }
     button { padding: 10px 16px; border: none; border-radius: var(--radius); cursor: pointer; font-weight: 500; transition: all 0.2s; }
     .btn-primary { background: var(--primary); color: white; }
@@ -30,77 +35,157 @@
     .totals { text-align: right; margin-top: 16px; font-size: 1.05rem; }
     .totals div { margin: 6px 0; }
     .totals .grand { font-size: 1.3rem; font-weight: bold; color: var(--primary); margin-top: 8px; }
-    #pdf-preview { padding: 40px; background: white; }
-    .toast { position: fixed; bottom: 20px; right: 20px; background: #1e293b; color: white; padding: 12px 16px; border-radius: var(--radius); opacity: 0; transform: translateY(20px); transition: all 0.3s; pointer-events: none; }
+    
+    /* 🔧 PDF 預覽區域 - 固定 A4 比例 */
+    #pdf-preview { 
+      padding: 20px; 
+      background: white; 
+      width: 210mm; 
+      min-height: 297mm; 
+      margin: 0 auto;
+      box-shadow: 0 0 20px rgba(0,0,0,0.1);
+    }
+    
+    .toast { position: fixed; bottom: 20px; right: 20px; background: #1e293b; color: white; padding: 12px 16px; border-radius: var(--radius); opacity: 0; transform: translateY(20px); transition: all 0.3s; pointer-events: none; z-index: 1000; }
     .toast.show { opacity: 1; transform: translateY(0); }
-    @media print { body { padding: 0; background: white; } .actions, #controls, header { display: none !important; } .card { box-shadow: none; border: 1px solid #ddd; } }
-    @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } table { display: block; overflow-x: auto; } }
+    
+    /* 🖨️ 列印/PDF 專用樣式 */
+    @media print {
+      body { padding: 0; background: white; }
+      .actions, #controls, header, .no-print { display: none !important; }
+      .card { box-shadow: none; border: none; padding: 0; }
+      #pdf-preview { width: 100%; margin: 0; box-shadow: none; }
+      table { page-break-inside: auto; }
+      tr { page-break-inside: avoid; page-break-after: auto; }
+      thead { display: table-header-group; }
+    }
+    
+    @media (max-width: 640px) { 
+      .grid-2 { grid-template-columns: 1fr; } 
+      #pdf-preview { width: 100%; min-height: auto; }
+      table { display: block; overflow-x: auto; } 
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <header><h1>📄 報價單生成器</h1></header>
+    
+    <!-- 🔧 PDF 預覽區域 - 固定寬度確保截圖完整 -->
     <div class="card" id="pdf-preview">
       <div class="grid-2">
         <div>
           <h3 style="margin-bottom:12px">報價方資訊</h3>
-          <div class="form-group"><input id="compName" placeholder="公司名稱" value="你的科技有限公司"></div>
+          <div class="form-group"><input id="compName" placeholder="公司名稱" value="山豬窟大飯店"></div>
           <div class="form-group"><input id="compTax" placeholder="統一編號"></div>
           <div class="form-group"><input id="compAddr" placeholder="地址"></div>
           <div class="form-group"><input id="compContact" placeholder="聯絡人/電話"></div>
         </div>
         <div>
           <h3 style="margin-bottom:12px">客戶資訊</h3>
-          <div class="form-group"><input id="clientName" placeholder="客戶公司名稱"></div>
+          <div class="form-group"><input id="clientName" placeholder="客戶公司名稱" value="威葆股份有限公司"></div>
           <div class="form-group"><input id="clientTax" placeholder="統一編號（選填）"></div>
           <div class="form-group"><input id="clientAddr" placeholder="地址"></div>
           <div class="form-group"><input id="clientContact" placeholder="聯絡人/電話"></div>
         </div>
       </div>
+      
       <div class="grid-2" style="margin-top:16px">
         <div class="form-group"><label>報價單號</label><input id="invoiceNo" value="QT-20240001"></div>
-        <div class="form-group"><label>日期 / 有效期限</label><input type="date" id="date"><input type="date" id="dueDate" style="margin-top:6px"></div>
+        <div class="form-group">
+          <label>日期 / 有效期限</label>
+          <input type="date" id="date">
+          <input type="date" id="dueDate" style="margin-top:6px">
+        </div>
       </div>
+
       <h3 style="margin:20px 0 10px">報價明細</h3>
       <table>
-        <thead><tr><th width="35%">項目</th><th width="12%">數量</th><th width="18%">單價</th><th width="12%">折扣%</th><th width="15%">金額</th><th width="8%">操作</th></tr></thead>
+        <thead>
+          <tr>
+            <th width="35%">項目</th>
+            <th width="12%">數量</th>
+            <th width="18%">單價</th>
+            <th width="12%">折扣%</th>
+            <th width="15%">金額</th>
+            <th width="8%" class="no-print">操作</th>
+          </tr>
+        </thead>
         <tbody id="items-body"></tbody>
       </table>
-      <div class="actions" style="justify-content:flex-end"><button class="btn-outline" onclick="addItem()">＋ 新增項目</button></div>
+      <div class="actions no-print" style="justify-content:flex-end">
+        <button class="btn-outline" onclick="addItem()">＋ 新增項目</button>
+      </div>
+
       <div class="totals">
         <div>小計：<span id="subtotal">$0</span></div>
         <div>營業稅 (<span id="taxRateDisplay">5</span>%)：<span id="tax">$0</span></div>
         <div class="grand">總計：<span id="grandTotal">$0</span></div>
       </div>
+
       <div class="grid-2" style="margin-top:20px">
         <div class="form-group"><label>稅率 %</label><input type="number" id="taxRate" value="5" min="0" max="100"></div>
         <div class="form-group"><label>備註</label><textarea id="notes" rows="3" placeholder="付款條件、交付方式、保固說明..."></textarea></div>
       </div>
     </div>
-    <div id="controls" class="actions" style="justify-content:center">
+
+    <!-- 控制按鈕 -->
+    <div id="controls" class="actions" style="justify-content:center; margin: 20px 0;">
       <button class="btn-primary" onclick="exportPDF()">📥 匯出 PDF</button>
+      <button class="btn-outline" onclick="window.print()">🖨️ 列印/另存</button>
       <button class="btn-outline" onclick="saveDraft()">💾 儲存草稿</button>
       <button class="btn-outline" onclick="loadDraft()">📂 讀取草稿</button>
       <button class="btn-danger" onclick="clearAll()">🗑️ 清空</button>
     </div>
   </div>
+
   <div class="toast" id="toast"></div>
+
   <script>
+    // ===== 狀態管理 =====
     const state = { items: [], taxRate: 5 };
     let idCounter = 1;
+
+    // ===== 初始化 =====
     const init = () => {
+      // 設定預設日期
       document.getElementById('date').valueAsDate = new Date();
       const due = new Date(); due.setDate(due.getDate() + 15);
       document.getElementById('dueDate').valueAsDate = due;
-      addItem(); attachEvents();
+      
+      addItem(); // 預設新增一列
+      attachEvents();
     };
+
+    // ===== 新增項目 =====
     const addItem = () => {
       const tbody = document.getElementById('items-body');
-      const tr = document.createElement('tr'); tr.dataset.id = idCounter;
-      tr.innerHTML = `<td><input class="item-name" placeholder="服務/商品名稱"></td><td><input type="number" class="item-qty" value="1" min="0" step="0.1"></td><td><input type="number" class="item-price" value="0" min="0"></td><td><input type="number" class="item-discount" value="0" min="0" max="100"></td><td class="item-amount">$0</td><td><button class="btn-danger" style="padding:6px 8px;font-size:0.8rem" onclick="removeItem(this)">刪除</button></td>`;
-      tbody.appendChild(tr); state.items.push(idCounter); idCounter++; recalc();
+      const tr = document.createElement('tr'); 
+      tr.dataset.id = idCounter;
+      tr.innerHTML = `
+        <td><input class="item-name" placeholder="服務/商品名稱"></td>
+        <td><input type="number" class="item-qty" value="1" min="0" step="0.1"></td>
+        <td><input type="number" class="item-price" value="0" min="0"></td>
+        <td><input type="number" class="item-discount" value="0" min="0" max="100"></td>
+        <td class="item-amount">$0</td>
+        <td class="no-print"><button class="btn-danger" style="padding:6px 8px;font-size:0.8rem" onclick="removeItem(this)">刪除</button></td>
+      `;
+      tbody.appendChild(tr); 
+      state.items.push(idCounter); 
+      idCounter++; 
+      recalc();
     };
-    const removeItem = (btn) => { const tr = btn.closest('tr'); const id = parseInt(tr.dataset.id); tr.remove(); state.items = state.items.filter(i => i !== id); recalc(); };
+
+    // ===== 刪除項目 =====
+    const removeItem = (btn) => { 
+      const tr = btn.closest('tr'); 
+      const id = parseInt(tr.dataset.id); 
+      tr.remove(); 
+      state.items = state.items.filter(i => i !== id); 
+      recalc(); 
+    };
+
+    // ===== 計算總計 =====
     const recalc = () => {
       let subtotal = 0;
       document.querySelectorAll('#items-body tr').forEach(tr => {
@@ -111,44 +196,179 @@
         tr.querySelector('.item-amount').textContent = `$${amount.toLocaleString('zh-TW', {maximumFractionDigits: 2})}`;
         subtotal += amount;
       });
-      const taxRate = parseFloat(document.getElementById('taxRate').value) || 0; state.taxRate = taxRate;
+
+      const taxRate = parseFloat(document.getElementById('taxRate').value) || 0;
+      state.taxRate = taxRate;
       document.getElementById('taxRateDisplay').textContent = taxRate;
+      
       const tax = subtotal * (taxRate / 100);
       const grand = subtotal + tax;
+
       document.getElementById('subtotal').textContent = `$${subtotal.toLocaleString('zh-TW', {maximumFractionDigits: 2})}`;
       document.getElementById('tax').textContent = `$${tax.toLocaleString('zh-TW', {maximumFractionDigits: 2})}`;
       document.getElementById('grandTotal').textContent = `$${grand.toLocaleString('zh-TW', {maximumFractionDigits: 2})}`;
     };
-    const attachEvents = () => { document.getElementById('items-body').addEventListener('input', recalc); document.getElementById('taxRate').addEventListener('input', recalc); };
+
+    // ===== 事件綁定 =====
+    const attachEvents = () => { 
+      document.getElementById('items-body').addEventListener('input', recalc); 
+      document.getElementById('taxRate').addEventListener('input', recalc); 
+    };
+
+    // ===== 🔧 修復版 PDF 匯出 =====
     const exportPDF = async () => {
-      const toast = document.getElementById('toast'); toast.textContent = '🔄 正在產生 PDF...'; toast.classList.add('show');
+      const toast = document.getElementById('toast');
+      toast.textContent = '🔄 正在產生 PDF...';
+      toast.classList.add('show');
+      
       try {
-        const el = document.getElementById('pdf-preview');
-        const opt = { margin: [10,10,10,10], filename: `${document.getElementById('invoiceNo').value || 'quotation'}.pdf`, image: { type: 'jpeg', quality: 0.98 }, html2canvas: { scale: 2, useCORS: true }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
-        await html2pdf().set(opt).from(el).save();
+        const element = document.getElementById('pdf-preview');
+        
+        // 🔧 關鍵：確保內容完全渲染
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // 🔧 臨時移除「刪除」按鈕避免出現在 PDF
+        const noPrintElements = document.querySelectorAll('.no-print');
+        noPrintElements.forEach(el => el.style.display = 'none');
+        
+        const opt = {
+          margin: [10, 10, 10, 10],
+          filename: `${document.getElementById('invoiceNo').value || 'quotation'}.pdf`,
+          image: { type: 'jpeg', quality: 0.98 },
+          html2canvas: { 
+            scale: 2, 
+            useCORS: true,
+            logging: false,
+            scrollY: 0,
+            windowWidth: 794, // A4 @ 96 DPI
+            windowHeight: 1123
+          },
+          jsPDF: { 
+            unit: 'mm', 
+            format: 'a4', 
+            orientation: 'portrait',
+            compress: true
+          },
+          pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+        };
+        
+        await html2pdf().set(opt).from(element).save();
+        
+        // 🔧 恢復刪除按鈕顯示
+        noPrintElements.forEach(el => el.style.display = '');
         toast.textContent = '✅ PDF 下載成功';
-      } catch (e) { toast.textContent = '❌ 匯出失敗，請重試'; console.error(e); }
-      finally { setTimeout(() => toast.classList.remove('show'), 2000); }
+        
+      } catch (e) {
+        console.error('PDF Error:', e);
+        toast.textContent = '❌ 匯出失敗，請改用「列印」功能';
+      } finally {
+        setTimeout(() => toast.classList.remove('show'), 2500);
+      }
     };
+
+    // ===== 收集表單狀態 =====
     const gatherFormState = () => ({
-      company: { name: document.getElementById('compName').value, tax: document.getElementById('compTax').value, addr: document.getElementById('compAddr').value, contact: document.getElementById('compContact').value },
-      client: { name: document.getElementById('clientName').value, tax: document.getElementById('clientTax').value, addr: document.getElementById('clientAddr').value, contact: document.getElementById('clientContact').value },
-      invoiceNo: document.getElementById('invoiceNo').value, date: document.getElementById('date').value, dueDate: document.getElementById('dueDate').value, taxRate: document.getElementById('taxRate').value, notes: document.getElementById('notes').value,
-      items: Array.from(document.querySelectorAll('#items-body tr')).map(tr => ({ name: tr.querySelector('.item-name').value, qty: tr.querySelector('.item-qty').value, price: tr.querySelector('.item-price').value, discount: tr.querySelector('.item-discount').value }))
+      company: { 
+        name: document.getElementById('compName').value, 
+        tax: document.getElementById('compTax').value, 
+        addr: document.getElementById('compAddr').value, 
+        contact: document.getElementById('compContact').value 
+      },
+      client: { 
+        name: document.getElementById('clientName').value, 
+        tax: document.getElementById('clientTax').value, 
+        addr: document.getElementById('clientAddr').value, 
+        contact: document.getElementById('clientContact').value 
+      },
+      invoiceNo: document.getElementById('invoiceNo').value, 
+      date: document.getElementById('date').value, 
+      dueDate: document.getElementById('dueDate').value, 
+      taxRate: document.getElementById('taxRate').value, 
+      notes: document.getElementById('notes').value,
+      items: Array.from(document.querySelectorAll('#items-body tr')).map(tr => ({ 
+        name: tr.querySelector('.item-name').value, 
+        qty: tr.querySelector('.item-qty').value, 
+        price: tr.querySelector('.item-price').value, 
+        discount: tr.querySelector('.item-discount').value 
+      }))
     });
-    const saveDraft = () => { localStorage.setItem('quotation_draft', JSON.stringify(gatherFormState())); showToast('💾 草稿已儲存'); };
-    const loadDraft = () => {
-      const raw = localStorage.getItem('quotation_draft'); if (!raw) { showToast('⚠️ 找不到草稿'); return; }
-      const d = JSON.parse(raw);
-      document.getElementById('compName').value = d.company.name || ''; document.getElementById('compTax').value = d.company.tax || ''; document.getElementById('compAddr').value = d.company.addr || ''; document.getElementById('compContact').value = d.company.contact || '';
-      document.getElementById('clientName').value = d.client.name || ''; document.getElementById('clientTax').value = d.client.tax || ''; document.getElementById('clientAddr').value = d.client.addr || ''; document.getElementById('clientContact').value = d.client.contact || '';
-      document.getElementById('invoiceNo').value = d.invoiceNo || ''; document.getElementById('date').value = d.date || ''; document.getElementById('dueDate').value = d.dueDate || ''; document.getElementById('taxRate').value = d.taxRate || 5; document.getElementById('notes').value = d.notes || '';
-      document.getElementById('items-body').innerHTML = ''; state.items = []; idCounter = 1;
-      d.items.forEach(item => { addItem(); const tr = document.querySelector(`#items-body tr[data-id="${idCounter-1}"]`); tr.querySelector('.item-name').value = item.name; tr.querySelector('.item-qty').value = item.qty; tr.querySelector('.item-price').value = item.price; tr.querySelector('.item-discount').value = item.discount; });
-      recalc(); showToast('📂 草稿已載入');
+
+    // ===== 儲存草稿 =====
+    const saveDraft = () => { 
+      localStorage.setItem('quotation_draft', JSON.stringify(gatherFormState())); 
+      showToast('💾 草稿已儲存'); 
     };
-    const clearAll = () => { if (!confirm('確定清空所有內容？')) return; document.querySelectorAll('input, textarea').forEach(el => el.value = ''); document.getElementById('items-body').innerHTML = ''; state.items = []; idCounter = 1; addItem(); document.getElementById('taxRate').value = 5; document.getElementById('date').valueAsDate = new Date(); const due = new Date(); due.setDate(due.getDate() + 15); document.getElementById('dueDate').valueAsDate = due; recalc(); };
-    const showToast = (msg) => { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2000); };
+
+    // ===== 讀取草稿 =====
+    const loadDraft = () => {
+      const raw = localStorage.getItem('quotation_draft'); 
+      if (!raw) { showToast('⚠️ 找不到草稿'); return; }
+      
+      const d = JSON.parse(raw);
+      
+      // 填寫基本資料
+      document.getElementById('compName').value = d.company?.name || ''; 
+      document.getElementById('compTax').value = d.company?.tax || ''; 
+      document.getElementById('compAddr').value = d.company?.addr || ''; 
+      document.getElementById('compContact').value = d.company?.contact || '';
+      
+      document.getElementById('clientName').value = d.client?.name || ''; 
+      document.getElementById('clientTax').value = d.client?.tax || ''; 
+      document.getElementById('clientAddr').value = d.client?.addr || ''; 
+      document.getElementById('clientContact').value = d.client?.contact || '';
+      
+      document.getElementById('invoiceNo').value = d.invoiceNo || ''; 
+      document.getElementById('date').value = d.date || ''; 
+      document.getElementById('dueDate').value = d.dueDate || ''; 
+      document.getElementById('taxRate').value = d.taxRate || 5; 
+      document.getElementById('notes').value = d.notes || '';
+      
+      // 重建明細
+      document.getElementById('items-body').innerHTML = ''; 
+      state.items = []; 
+      idCounter = 1;
+      
+      if (d.items?.length) {
+        d.items.forEach(item => { 
+          addItem(); 
+          const tr = document.querySelector(`#items-body tr[data-id="${idCounter-1}"]`); 
+          if (tr) {
+            tr.querySelector('.item-name').value = item.name || ''; 
+            tr.querySelector('.item-qty').value = item.qty || 1; 
+            tr.querySelector('.item-price').value = item.price || 0; 
+            tr.querySelector('.item-discount').value = item.discount || 0; 
+          }
+        });
+      }
+      
+      recalc(); 
+      showToast('📂 草稿已載入');
+    };
+
+    // ===== 清空 =====
+    const clearAll = () => { 
+      if (!confirm('確定清空所有內容？')) return; 
+      document.querySelectorAll('input, textarea').forEach(el => el.value = ''); 
+      document.getElementById('items-body').innerHTML = ''; 
+      state.items = []; 
+      idCounter = 1; 
+      addItem(); 
+      document.getElementById('taxRate').value = 5; 
+      document.getElementById('date').valueAsDate = new Date(); 
+      const due = new Date(); due.setDate(due.getDate() + 15); 
+      document.getElementById('dueDate').valueAsDate = due; 
+      recalc(); 
+    };
+
+    // ===== 提示訊息 =====
+    const showToast = (msg) => { 
+      const t = document.getElementById('toast'); 
+      t.textContent = msg; 
+      t.classList.add('show'); 
+      setTimeout(() => t.classList.remove('show'), 2000); 
+    };
+
+    // ===== 啟動 =====
     window.onload = init;
   </script>
 </body>
